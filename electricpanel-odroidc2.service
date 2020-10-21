@@ -1,0 +1,14 @@
+[Unit]
+Description=Electricpanel odroidc2
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+Restart=always
+RestartSec=1
+User=zabbix
+WorkingDirectory=/etc/zabbix
+ExecStart=/usr/bin/electricpanel-odroidc2
+
+[Install]
+WantedBy=multi-user.target

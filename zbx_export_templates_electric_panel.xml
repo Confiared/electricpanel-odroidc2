@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<zabbix_export>
+    <version>5.0</version>
+    <date>2020-09-11T22:12:14Z</date>
+    <groups>
+        <group>
+            <name>Electric</name>
+        </group>
+    </groups>
+    <templates>
+        <template>
+            <template>Template Electric Panel</template>
+            <name>Template Electric Panel</name>
+            <groups>
+                <group>
+                    <name>Electric</name>
+                </group>
+            </groups>
+            <applications>
+                <application>
+                    <name>Electric</name>
+                </application>
+            </applications>
+            <items>
+                <item>
+                    <name>Stop button</name>
+                    <key>electricpanel.value[Stop]</key>
+                    <preprocessing>
+                        <step>
+                            <type>DISCARD_UNCHANGED</type>
+                            <params/>
+                        </step>
+                    </preprocessing>
+                    <triggers>
+                        <trigger>
+                            <expression>{last(0)}=1</expression>
+                            <name>Stop button pressed</name>
+                            <priority>HIGH</priority>
+                        </trigger>
+                    </triggers>
+                </item>
+            </items>
+            <discovery_rules>
+                <discovery_rule>
+                    <name>Discover Electric input</name>
+                    <key>electricpanel.discovery</key>
+                    <delay>15m</delay>
+                    <filter>
+                        <conditions>
+                            <condition>
+                                <macro>{#INPUT}</macro>
+                                <value>Stop</value>
+                                <operator>NOT_MATCHES_REGEX</operator>
+                                <formulaid>A</formulaid>
+                            </condition>
+                        </conditions>
+                    </filter>
+                    <lifetime>0</lifetime>
+                    <item_prototypes>
+                        <item_prototype>
+                            <name>Down count {#INPUT}</name>
+                            <key>electricpanel.downcount[{#INPUT}]</key>
+                            <history>7d</history>
+                            <applications>
+                                <application>
+                                    <name>Electric</name>
+                                </application>
+                            </applications>
+                            <application_prototypes>
+                                <application_prototype>
+                                    <name>Electric</name>
+                                </application_prototype>
+                            </application_prototypes>
+                            <preprocessing>
+                                <step>
+                                    <type>DISCARD_UNCHANGED</type>
+                                    <params/>
+                                </step>
+                            </preprocessing>
+                            <trigger_prototypes>
+                                <trigger_prototype>
+                                    <expression>{diff(0)}&gt;0</expression>
+                                    <name>Down count change for {#INPUT}</name>
+                                    <priority>AVERAGE</priority>
+                                </trigger_prototype>
+                            </trigger_prototypes>
+                        </item_prototype>
+                        <item_prototype>
+                            <name>Electric line {#INPUT}</name>
+                            <key>electricpanel.value[{#INPUT}]</key>
+                            <history>7d</history>
+                            <applications>
+                                <application>
+                                    <name>Electric</name>
+                                </application>
+                            </applications>
+                            <application_prototypes>
+                                <application_prototype>
+                                    <name>Electric</name>
+                                </application_prototype>
+                            </application_prototypes>
+                            <preprocessing>
+                                <step>
+                                    <type>DISCARD_UNCHANGED</type>
+                                    <params/>
+                                </step>
+                            </preprocessing>
+                            <trigger_prototypes>
+                                <trigger_prototype>
+                                    <expression>{last(0)}=0</expression>
+                                    <name>Electric line down {#INPUT}</name>
+                                    <priority>AVERAGE</priority>
+                                </trigger_prototype>
+                            </trigger_prototypes>
+                        </item_prototype>
+                    </item_prototypes>
+                </discovery_rule>
+            </discovery_rules>
+        </template>
+    </templates>
+</zabbix_export>
