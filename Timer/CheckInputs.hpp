@@ -2,9 +2,23 @@
 #define CheckInputs_H
 
 #include "../Timer.hpp"
+#include <vector>
 
 class CheckInputs : public Timer
 {
+public:
+    struct InputV
+    {
+        int pin;
+        bool value;
+    };
+    static int inputStop;
+
+    //power, [0] = output pin
+    static std::vector<int> power;
+
+    //the first input need match power[], [0] = input pin, [1] = initial value
+    static std::vector<InputV> inputs;
 public:
     CheckInputs();
     static CheckInputs *checkInputs;
@@ -14,15 +28,6 @@ public:
     bool valueIsUP(uint8_t index);
     uint64_t getLastDown(uint8_t index);
 private:
-    static const int inputStop;
-
-    //power, [0] = output pin, [1] = initial value
-    static const int power[];
-    static const int powercount;
-
-    //the first input need match power[], [0] = input pin, [1] = initial value
-    static const int inputs[][2];
-    static const int inputcount;
     static const int valueCount;
 
     static const int lowValueHysteresis;

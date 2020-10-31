@@ -8,6 +8,9 @@
 #include <unistd.h>
 #include <linux/un.h>
 #include <stdio.h>
+#include <fstream>
+#include <sstream>
+#include <unordered_map>
 #include "Timer/CheckInputs.hpp"
 #include "Server.hpp"
 
@@ -54,10 +57,105 @@ int main(int argc, char *argv[])
     }
 
     std::vector<std::string> inputsMapping;
-    inputsMapping.push_back("Victron");
-    inputsMapping.push_back("BlueSun");
-    inputsMapping.push_back("CRE");
-    inputsMapping.push_back("Stop");
+    {
+        std::ifstream inputsfile("inputs.conf");
+/* format:
+21 S1
+22 S2
+23 CRE
+24 Stop
+*/
+        std::ifstream outputsfile("outputs.conf");
+/* format:
+12 S1
+13 S2
+14 CRE
+*/
+
+        std::unordered_map<std::string,int> inputsMap;
+
+        std::string line;
+        while (std::getline(inputsfile, line))
+        {
+            std::istringstream iss(line);
+            int pin;
+            std::string name;
+            if (!(iss >> pin >> name))
+            {
+                std::cerr << "error parse inputs" << std::endl;
+                abort();
+            }
+            if(name.empty())
+            {
+                std::cerr << "error parse inputs" << std::endl;
+                abort();
+            }
+            if(inputsMap.find(name)!=inputsMap.cend())
+            {
+                std::cerr << "error parse input \"" << name << "\", already set" << std::endl;
+                abort();
+            }
+            inputsMap[name]=pin;
+        }
+        if(inputsMap.find("Stop")==inputsMap.cend())
+        {
+            std::cerr << "error parse inputs: No Stop value found" << std::endl;
+            abort();
+        }
+        CheckInputs::inputStop=inputsMap.at("Stop");
+        inputsMap.erase("Stop");
+        while (std::getline(outputsfile, line))
+        {
+            std::istringstream iss(line);
+            int pin;
+            std::string name;
+            if (!(iss >> pin >> name))
+            {
+                std::cerr << "error parse inputs" << std::endl;
+                abort();
+            }
+            if(name.empty())
+            {
+                std::cerr << "error parse inputs" << std::endl;
+                abort();
+            }
+            if(inputsMap.find(name)==inputsMap.cend())
+            {
+                std::cerr << "error parse output \"" << name << "\" not found into input list" << std::endl;
+                abort();
+            }
+            inputsMapping.push_back(name);
+            CheckInputs::power.push_back(pin);
+            CheckInputs::InputV i;
+            i.pin=inputsMap.at(name);
+            i.value=false;
+            CheckInputs::inputs.push_back(i);
+            inputsMap.erase(name);
+        }
+        {
+            CheckInputs::InputV i;
+            i.pin=CheckInputs::inputStop;
+            i.value=true;
+            CheckInputs::inputs.push_back(i);
+            inputsMapping.push_back("Stop");
+        }
+        if(CheckInputs::inputs.empty())
+        {
+            std::cerr << "error parse some input(s) is not into output list" << std::endl;
+            abort();
+        }
+    }
+    if(inputsMapping.size()!=CheckInputs::inputs.size())
+    {
+        std::cerr << "error, input list not match name list" << std::endl;
+        abort();
+    }
+    if(CheckInputs::power.size()!=(CheckInputs::inputs.size()-1))
+    {
+        std::cerr << "error, input list not match output list" << std::endl;
+        abort();
+    }
+
     for (int i = 1; i < argc; ++i) {
         if (std::string(argv[i]) == "--list") {
             std::cout << "{\n"
@@ -172,6 +270,22 @@ int main(int argc, char *argv[])
     Server s(UNIXSOCKET_PATH);
     CheckInputs::checkInputs=new CheckInputs();
     CheckInputs::checkInputs->start(1);
+
+    {
+        size_t index=0;
+        while(index<CheckInputs::inputs.size())
+        {
+            if(CheckInputs::inputs.at(index).value)
+                std::cout << "\e[31;1m";
+            else
+                std::cout << "\e[32;1m";
+            std::cout << inputsMapping.at(index) << "\e[0m: " << CheckInputs::inputs.at(index).pin;
+            if(index<CheckInputs::power.size())
+                std::cout << "," << CheckInputs::power.at(index);
+            std::cout << std::endl;
+            index++;
+        }
+    }
 
     (void)s;
     for (;;) {

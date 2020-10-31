@@ -9,7 +9,7 @@
  | I/O | wPi |   Name  | Mode | V | Physical | V | Mode |  Name   | wPi | I/O |
  +-----+-----+---------+------+---+----++----+---+------+---------+-----+-----+
  |     |     |    3.3V |      |   |  1 || 2  |   |      | 5V      |     |     |
- | 205 |   8 |   SDA.1 |  OUT | 1 |  3 || 4  |   |      | 5V      |     |     |
+ | 205 |   8 |   SDA.1 |   IN | 1 |  3 || 4  |   |      | 5V      |     |     |
  | 206 |   9 |   SCL.1 |   IN | 1 |  5 || 6  |   |      | 0V      |     |     |
  | 249 |   7 |  IO.249 |   IN | 1 |  7 || 8  |   |      | TxD1    | 15  |     |
  |     |     |      0V |      |   |  9 || 10 |   |      | RxD1    | 16  |     |
@@ -18,14 +18,14 @@
  | 237 |   3 |  IO.237 |   IN | 1 | 15 || 16 | 1 | IN   | IO.236  | 4   | 236 |
  |     |     |    3.3V |      |   | 17 || 18 | 1 | IN   | IO.233  | 5   | 233 |
  | 235 |  12 |  IO.235 |  OUT | 0 | 19 || 20 |   |      | 0V      |     |     |
- | 232 |  13 |  IO.232 |   IN | 1 | 21 || 22 | 1 | IN   | IO.231  | 6   | 231 |
- | 230 |  14 |  IO.230 |   IN | 1 | 23 || 24 | 1 | IN   | IO.229  | 10  | 229 |
+ | 232 |  13 |  IO.232 |  OUT | 1 | 21 || 22 | 1 | IN   | IO.231  | 6   | 231 |
+ | 230 |  14 |  IO.230 |  OUT | 1 | 23 || 24 | 1 | IN   | IO.229  | 10  | 229 |
  |     |     |      0V |      |   | 25 || 26 | 1 | OUT  | IO.225  | 11  | 225 |
  |     |  30 |   SDA.2 |      |   | 27 || 28 |   |      | SCL.2   | 31  |     |
  | 228 |  21 |  IO.228 |   IN | 1 | 29 || 30 |   |      | 0V      |     |     |
- | 219 |  22 |  IO.219 |   IN | 1 | 31 || 32 | 1 | IN   | IO.224  | 26  | 224 |
- | 234 |  23 |  IO.234 |   IN | 0 | 33 || 34 |   |      | 0V      |     |     |
- | 214 |  24 |  IO.214 |   IN | 1 | 35 || 36 | 1 | IN   | IO.218  | 27  | 218 |
+ | 219 |  22 |  IO.219 |   IN | 0 | 31 || 32 | 1 | IN   | IO.224  | 26  | 224 |
+ | 234 |  23 |  IO.234 |   IN | 1 | 33 || 34 |   |      | 0V      |     |     |
+ | 214 |  24 |  IO.214 |   IN | 0 | 35 || 36 | 1 | IN   | IO.218  | 27  | 218 |
  |     |  25 |   AIN.1 |      |   | 37 || 38 |   |      | 1V8     | 28  |     |
  |     |     |      0V |      |   | 39 || 40 |   |      | AIN.0   | 29  |     |
  +-----+-----+---------+------+---+----++----+---+------+---------+-----+-----+
@@ -35,24 +35,13 @@
 
 CheckInputs *CheckInputs::checkInputs=nullptr;
 
-const int CheckInputs::inputStop=24;
+int CheckInputs::inputStop=24;
 
-//power, [0] = output pin, [1] = initial value
-const int CheckInputs::power[]={
-    12,//SolarVictron
-    13,//SolarBluesun
-    14,//CRE
-  };
-const int CheckInputs::powercount=sizeof(CheckInputs::power) / sizeof(CheckInputs::power[0]);
-
+//power, [0] = output pin
+std::vector<int> CheckInputs::power;
 //the first input need match power[], [0] = input pin, [1] = initial value
-const int CheckInputs::inputs[][2]={
-    {21,false},//SolarVictron
-    {22,false},//SolarBluesun
-    {23,false},//CRE
-    {CheckInputs::inputStop,true},//stop
-  };
-const int CheckInputs::inputcount=sizeof(CheckInputs::inputs) / sizeof(CheckInputs::inputs[0]);
+std::vector<CheckInputs::InputV> CheckInputs::inputs;
+
 const int CheckInputs::valueCount=256;
 
 const int CheckInputs::lowValueHysteresis=30;
@@ -62,31 +51,31 @@ CheckInputs::CheckInputs()
 {
     //stop default to true, value: power, stop
     indexLastValues=0;
-    lastDown=new uint64_t[inputcount];
+    lastDown=new uint64_t[CheckInputs::inputs.size()];
     if(lastDown==nullptr)
     {
         std::cerr << "lastDown==nullptr (abort)" << std::endl;
         abort();
     }
-    downCountForReturn=new uint64_t[inputcount];
+    downCountForReturn=new uint64_t[CheckInputs::inputs.size()];
     if(downCountForReturn==nullptr)
     {
         std::cerr << "downCountForReturn==nullptr (abort)" << std::endl;
         abort();
     }
-    inputValues=(bool*)malloc(sizeof(bool)*inputcount*valueCount);
+    inputValues=(bool*)malloc(sizeof(bool)*CheckInputs::inputs.size()*valueCount);
     if(inputValues==nullptr)
     {
         std::cerr << "inputValues==nullptr (abort)" << std::endl;
         abort();
     }
-    lastValues=new bool[inputcount];
+    lastValues=new bool[CheckInputs::inputs.size()];
     if(lastValues==nullptr)
     {
         std::cerr << "lastValues==nullptr (abort)" << std::endl;
         abort();
     }
-    sumValuesTrue=new int[inputcount];
+    sumValuesTrue=new int[CheckInputs::inputs.size()];
     if(sumValuesTrue==nullptr)
     {
         std::cerr << "sumValuesTrue==nullptr (abort)" << std::endl;
@@ -105,13 +94,13 @@ void CheckInputs::setup()
 {
     wiringPiSetup();
 
-    for( int i = 0; i < inputcount; i++ )
+    for( size_t i = 0; i < CheckInputs::inputs.size(); i++ )
     {
         lastDown[i]=0;
         downCountForReturn[i]=0;
     }
 
-    for( int i = 0; i < powercount; i++ )
+    for( size_t i = 0; i < CheckInputs::power.size(); i++ )
     {
         // set the digital pin as output:
         pinMode(power[i], OUTPUT);
@@ -123,11 +112,11 @@ void CheckInputs::setup()
 
     pinMode(inputStop, INPUT);
 
-    for( int i = 0; i < powercount; i++ )
-        pinMode(inputs[i][0], INPUT);
-    for( int i = 0; i < inputcount; i++ )
+    for( size_t i = 0; i < CheckInputs::power.size(); i++ )
+        pinMode(inputs.at(i).pin, INPUT);
+    for( size_t i = 0; i < CheckInputs::inputs.size(); i++ )
     {
-        if(!inputs[i][1])
+        if(!inputs.at(i).value)
         {
             sumValuesTrue[i]=0;
             lastValues[i]=false;
@@ -148,7 +137,7 @@ void CheckInputs::setup()
 
 bool CheckInputs::valueIsUP(uint8_t index)
 {
-    if(index>=inputcount)
+    if(index>=CheckInputs::inputs.size())
         return false;
     else
         return lastValues[index];
@@ -156,7 +145,7 @@ bool CheckInputs::valueIsUP(uint8_t index)
 
 uint64_t CheckInputs::getLastDown(uint8_t index)
 {
-    if(index>=inputcount)
+    if(index>=CheckInputs::inputs.size())
         return 0;
     else
         return downCountForReturn[index];
@@ -168,16 +157,16 @@ void CheckInputs::loop()
 
     int previousStopVar = lastValues[3];
     //parse the input with hysteresis + average to fix some corrupted input
-    for( int i = 0; i < inputcount; i++ )
+    for( size_t i = 0; i < CheckInputs::inputs.size(); i++ )
     {
-        int v = digitalRead(inputs[i][0]);
+        int v = digitalRead(inputs.at(i).pin);
         bool t=inputValues[i*valueCount+indexLastValues];
         if(t==true)
             sumValuesTrue[i]--;
         if(v==HIGH)
             sumValuesTrue[i]++;
         bool l=lastValues[i];
-        if(i<inputcount) //in the future, then time drift, fix by 0 because no action before 10s (see upIfLastDownIsGreaterMsThan)
+        if(i<CheckInputs::inputs.size()) //in the future, then time drift, fix by 0 because no action before 10s (see upIfLastDownIsGreaterMsThan)
         {
             if(lastDown[i]>currentMillis)
                 lastDown[i]=0;
@@ -188,11 +177,11 @@ void CheckInputs::loop()
         {
             if(lastValues[i]==true)
             {
-                if(i<inputcount)
+                if(i<CheckInputs::inputs.size())
                     downCountForReturn[i]++;
             }
             lastValues[i]=false;
-            if(i<inputcount)
+            if(i<CheckInputs::inputs.size())
                 lastDown[i]=currentMillis;
         }
         inputValues[i*valueCount+indexLastValues]=v;
@@ -204,7 +193,7 @@ void CheckInputs::loop()
     int stopVar = lastValues[3];
     if(stopVar==HIGH)
     {
-        for( int i = 0; i < powercount; i++ )
+        for( size_t i = 0; i < CheckInputs::power.size(); i++ )
             digitalWrite(power[i], HIGH);
         lastPowerNumber = -1;
         previousMillis = currentMillis;
@@ -216,7 +205,7 @@ void CheckInputs::loop()
         if(previousStopVar==HIGH)
             system("echo none > /sys/class/leds/blue:heartbeat/trigger");
         //detect down
-        for( int i = 0; i < powercount; i++ )
+        for( size_t i = 0; i < CheckInputs::power.size(); i++ )
         {
             if(lastValues[i]==false)
                 lastDown[i]=currentMillis;
@@ -228,7 +217,7 @@ void CheckInputs::loop()
         {
             int bestPowerNumber=-1;
             //power is considered as UP only if no down during the last 10s
-            for( int i = 0; i < powercount; i++ )
+            for( size_t i = 0; i < CheckInputs::power.size(); i++ )
             {
                 if(lastDown[i]<(currentMillis-upIfLastDownIsGreaterMsThan))
                 {
@@ -240,7 +229,7 @@ void CheckInputs::loop()
             {
                 if(lastPowerNumber!=-1)
                 {
-                    for( int i = 0; i < powercount; i++ )
+                    for( size_t i = 0; i < CheckInputs::power.size(); i++ )
                         digitalWrite(power[i], HIGH);
                     //VERY IMPORTANT due to delay of relay to change, if drop then short circuit damage
                     lastPowerNumber = -1;
@@ -248,7 +237,7 @@ void CheckInputs::loop()
                 }
                 else
                 {
-                    if(bestPowerNumber>=0 && bestPowerNumber<powercount)
+                    if(bestPowerNumber>=0 && bestPowerNumber<(int)CheckInputs::power.size())
                         digitalWrite(power[bestPowerNumber], LOW);
                     lastPowerNumber=bestPowerNumber;
                     //prevent change during 1s
