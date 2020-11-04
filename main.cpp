@@ -58,14 +58,14 @@ int main(int argc, char *argv[])
 
     std::vector<std::string> inputsMapping;
     {
-        std::ifstream inputsfile("inputs.conf");
+        std::ifstream inputsfile("/var/lib/electricpanel-odroidc2/inputs.conf");
 /* format:
 21 S1
 22 S2
 23 CRE
 24 Stop
 */
-        std::ifstream outputsfile("outputs.conf");
+        std::ifstream outputsfile("/var/lib/electricpanel-odroidc2/outputs.conf");
 /* format:
 12 S1
 13 S2
@@ -104,6 +104,11 @@ int main(int argc, char *argv[])
         }
         CheckInputs::inputStop=inputsMap.at("Stop");
         inputsMap.erase("Stop");
+        if(inputsMap.size()<2)
+        {
+            std::cerr << "input line count < 2, then why have that's software?" << std::endl;
+            abort();
+        }
         while (std::getline(outputsfile, line))
         {
             std::istringstream iss(line);
@@ -248,6 +253,27 @@ int main(int argc, char *argv[])
             std::cerr << "--value X: get a single value" << std::endl;
             std::cerr << "--downcount X: get the down count detected" << std::endl;
             return 1;
+        }
+    }
+
+    //only one instance allowed at time
+    {
+        sockaddr_un addr;
+        int fd;
+
+        if ( (fd = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
+        perror("socket error");
+        exit(-1);
+        }
+
+        memset(&addr, 0, sizeof(addr));
+        addr.sun_family = AF_UNIX;
+        strncpy(addr.sun_path, UNIXSOCKET_PATH, sizeof(addr.sun_path)-1);
+
+        if(connect(fd, (struct sockaddr*)&addr, sizeof(addr)) == 0) {
+            perror("Another instance started");
+            exit(-1);
+            abort();
         }
     }
 
